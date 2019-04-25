@@ -40,8 +40,8 @@ class DQNAgent:
                       optimizer=Adam(lr=self.learning_rate))
         return model
 
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+    def remember(self, state, action, reward, next_state, done, time):
+        self.memory.append((state, action, reward, next_state, done, time))
 
     def act(self, state):
         if np.random.rand() <= self.epsilon:
@@ -51,7 +51,7 @@ class DQNAgent:
 
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
-        for state, action, reward, next_state, done in minibatch:
+        for state, action, reward, next_state, done, time in minibatch:
             target = reward
             if not done:
                 target = (reward + self.gamma *
@@ -67,7 +67,7 @@ class DQNAgent:
         minibatch = random.sample(self.memory, batch_size)
         next_states = []
         states = []
-        for state, action, reward, next_state, done in minibatch:
+        for state, action, reward, next_state, done, time in minibatch:
             next_states.append(next_state[0])
             states.append(state[0])
 
@@ -77,13 +77,15 @@ class DQNAgent:
         Q = self.model.predict(states)
 
         targets_f = []
-        for i, (state, action, reward, next_state, done) in enumerate(minibatch):
+        for i, (state, action, reward, next_state, done, time) in enumerate(minibatch):
             target = reward
             if not done:
                 target = (reward + self.gamma * np.amax(Qn[i]))
             target_f = Q[i]
             target_f[action] = target
             targets_f.append(target_f)
+            # if time == 400:
+            #     print("Q: ", Q[i])
 
         targets_f = np.stack(targets_f, axis=0)
         self.model.fit(states, targets_f, epochs=1, verbose=0)
@@ -97,7 +99,28 @@ class DQNAgent:
         self.model.save_weights(name)
 
 
-if __name__ == "__main__":
+def test():
+    env = gym.make('CartPole-v1')
+    state_size = env.observation_space.shape[0]
+    action_size = env.action_space.n
+    agent = DQNAgent(state_size, action_size)
+    agent.load("./est-dqn.h5")
+    agent.epsilon = 0.01
+
+    state = env.reset()
+    state = np.reshape(state, [1, state_size])
+    for time in range(1000):
+        env.render()
+        action = agent.act(state)
+        next_state, reward, done, _ = env.step(action)
+        next_state = np.reshape(next_state, [1, state_size])
+        state = next_state
+        if done:
+            print("score: {}".format(time))
+            break
+
+
+def train():
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
@@ -116,11 +139,11 @@ if __name__ == "__main__":
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
             if time < 499 and done:
-                reward = -50
+                reward = -20
             if time == 499:
-                reward = 10
+                reward = 20  # 1/(1 - gamma)
             next_state = np.reshape(next_state, [1, state_size])
-            agent.remember(state, action, reward, next_state, done)
+            agent.remember(state, action, reward, next_state, done, time)
             state = next_state
             if done:
                 score_window.append(time)
@@ -132,3 +155,9 @@ if __name__ == "__main__":
             agent.replay2(batch_size)
         if e % 100 == 0:
             agent.save("./est-dqn.h5")
+
+
+if __name__ == "__main__":
+    # train()
+    test()
+
