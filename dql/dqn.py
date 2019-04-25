@@ -104,7 +104,7 @@ def test():
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
-    agent.load("./est-dqn.h5")
+    agent.load("./est-dqn_perfect.h5")
     agent.epsilon = 0.01
 
     state = env.reset()
@@ -127,7 +127,6 @@ def train():
     agent = DQNAgent(state_size, action_size)
     # agent.load("./est-dqn.h5")
     # agent.epsilon = 0.01
-    done = False
     batch_size = 64
     score_window = deque(maxlen=100)
 
@@ -158,6 +157,6 @@ def train():
 
 
 if __name__ == "__main__":
-    # train()
+    #train()
     test()
 
