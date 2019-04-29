@@ -1,0 +1,20 @@
+Current
+ - 68s - loss: 0.2807 - val_loss: 0.2950
+
+Conv
+ - 71s - loss: 0.2777 - val_loss: 0.2848
+
+ dense
+ - 59s - loss: 0.2941 - val_loss: 0.2900
+
+2 Conv
+ - 58s - loss: 0.2712 - val_loss: 0.2636
+
+2 Conv more filters
+ - 73s - loss: 0.2381 - val_loss: 0.2388
+
+Conv More filters
+ - 70s - loss: 0.2775 - val_loss: 0.2793
+
+2 conv 128
+    76s - loss: 0.2246 - val_loss: 0.2333
