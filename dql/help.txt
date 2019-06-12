@@ -18,3 +18,186 @@ Conv More filters
 
 2 conv 128
     76s - loss: 0.2246 - val_loss: 0.2333
+
+
+Pacman
+------
+default
+ - 121s - loss: 5360.7839 - val_loss: 844.5342
+Epoch 2/15
+ - 102s - loss: 687.3661 - val_loss: 244.3646
+Epoch 3/15
+ - 103s - loss: 289.7120 - val_loss: 174.2822
+Epoch 4/15
+ - 80s - loss: 193.3338 - val_loss: 163.2753
+Epoch 5/15
+ - 82s - loss: 152.9839 - val_loss: 120.7209
+Epoch 6/15
+ - 75s - loss: 127.4221 - val_loss: 114.4475
+Epoch 7/15
+ - 90s - loss: 112.5242 - val_loss: 120.2476
+Epoch 8/15
+ - 80s - loss: 104.5736 - val_loss: 108.5717
+Epoch 9/15
+ - 81s - loss: 95.6346 - val_loss: 102.3932
+Epoch 10/15
+ - 83s - loss: 86.8145 - val_loss: 93.0244
+Epoch 11/15
+ - 89s - loss: 81.7975 - val_loss: 102.7275
+Epoch 12/15
+ - 82s - loss: 76.4152 - val_loss: 82.2969
+Epoch 13/15
+ - 80s - loss: 71.0182 - val_loss: 93.6386
+Epoch 14/15
+ - 92s - loss: 73.9578 - val_loss: 78.3162
+Epoch 15/15
+ - 80s - loss: 65.8118 - val_loss: 81.1825
+
+1.5 filters
+Epoch 15/15
+ - 93s - loss: 63.7124 - val_loss: 68.8584
+
++ 2 conv
+Epoch 15/15
+ - 83s - loss: 74.3221 - val_loss: 105.7999
+
+1er strides 2,2
+Epoch 15/15
+ - 126s - loss: 53.9084 - val_loss: 52.5134
+
+1er strides 2,2, +2 conv
+Epoch 15/15
+ - 154s - loss: 27.9568 - val_loss: 40.4564
+ Epoch 15/15
+ - 142s - loss: 39.5075 - val_loss: 46.7883
+
+
+1er strides 2,2, +2 conv, reg 0.0001
+Epoch 15/15
+ - 146s - loss: 41.5882 - val_loss: 47.9654
+
+1er strides 2,2, +2 conv, reg 0.00002
+Epoch 15/15
+ - 147s - loss: 42.1208 - val_loss: 46.7174
+
+1er strides 2,2, +2 conv, batchnorm
+Epoch 15/15
+ - 145s - loss: 71.9352 - val_loss: 106.3521
+
+1er strides 2,2, +2 conv, 128 2da dense
+Epoch 15/15
+ - 139s - loss: 122.1497 - val_loss: 130.8816 (raro, bajo y subio)
+
+1er strides 2,2, +4 conv
+ Epoch 15/15
+ - 160s - loss: 46.2261 - val_loss: 51.2775
+
+1er strides 2,2, conv 48 96
+Epoch 15/15
+ - 127s - loss: 47.3026 - val_loss: 58.1329
+
+1er strides 2,2, conv 98 128
+Epoch 15/15
+ - 164s - loss: 37.7176 - val_loss: 44.6984
+
+1er strides 2,2, conv 128 128
+Epoch 15/15
+ - 168s - loss: 40.3007 - val_loss: 46.9868
+
+1er strides 2,2, conv 96 96
+Epoch 15/15
+ - 142s - loss: 43.0910 - val_loss: 43.5502
+
+ epoch 1, epsilon decay 0.999
+ episode: 9637/100000, score: 550.0, avg: 790.2, frames: 894, e: 0.01
+
+
+5conv
+Epoch 13/15
+ - 217s - loss: 0.4512 - val_loss: 0.7324
+Epoch 14/15
+ - 220s - loss: 0.4072 - val_loss: 1.7711
+Epoch 15/15
+ - 218s - loss: 0.4055 - val_loss: 0.5903
+
+7 conv
+Epoch 13/15
+ - 258s - loss: 0.3131 - val_loss: 0.4964
+Epoch 14/15
+ - 262s - loss: 0.2653 - val_loss: 0.5285
+Epoch 15/15
+ - 257s - loss: 0.2491 - val_loss: 0.4934
+
+7 conv reg
+Epoch 13/15
+ - 245s - loss: 0.3912 - val_loss: 0.7084
+Epoch 14/15
+ - 243s - loss: 0.3544 - val_loss: 0.5197
+Epoch 15/15
+ - 252s - loss: 0.3221 - val_loss: 0.5156
+
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      911    0.509    0.001   14.394    0.016 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\backend\tensorflow_backend.py:2696(__call__)
+      911    0.018    0.000   13.757    0.015 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\backend\tensorflow_backend.py:2632(_call)
+      911    0.010    0.000   12.628    0.014 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\tensorflow\python\client\session.py:1429(__call__)
+      911   12.597    0.014   12.597    0.014 {built-in method _pywrap_tensorflow_internal.TF_SessionRunCallable}
+      842    0.384    0.000   12.429    0.015 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\engine\training.py:1115(predict)
+      842    0.088    0.000   11.992    0.014 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\engine\training_arrays.py:224(predict_loop)
+      887    0.010    0.000    9.408    0.011 D:/repos/cartpole/dql/pacman.py:115(act)
+        1    0.007    0.007    6.717    6.717 D:/repos/cartpole/dql/pacman.py:137(replay)
+        1    0.001    0.001    3.440    3.440 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\engine\training.py:825(fit)
+        1    0.045    0.045    3.439    3.439 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\engine\training_arrays.py:21(fit_loop)
+      887    0.004    0.000    1.194    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\gym\wrappers\time_limit.py:29(step)
+      887    0.014    0.000    1.188    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\gym\envs\atari\atari_env.py:86(step)
+    10272    1.056    0.000    1.056    0.000 {built-in method numpy.array}
+      923    0.001    0.000    1.053    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\numpy\core\numeric.py:469(asarray)
+      911    0.003    0.000    0.880    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\utils\generic_utils.py:499(slice_arrays)
+      911    0.875    0.001    0.875    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\utils\generic_utils.py:526(<listcomp>)
+      891    0.008    0.000    0.772    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\numpy\core\shape_base.py:352(stack)
+      891    0.745    0.001    0.745    0.001 {built-in method numpy.concatenate}
+      888    0.002    0.000    0.657    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\gym\envs\atari\atari_env.py:110(_get_obs)
+      888    0.001    0.000    0.655    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\gym\envs\atari\atari_env.py:100(_get_image)
+      888    0.051    0.000    0.654    0.001 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\atari_py\ale_python_interface.py:229(getScreenRGB2)
+      888    0.004    0.000    0.569    0.001 D:/repos/cartpole/dql/pacman.py:132(get_state_buffer)
+      889    0.562    0.001    0.562    0.001 {built-in method numpy.empty}
+     2676    0.505    0.000    0.505    0.000 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\atari_py\ale_python_interface.py:158(act)
+      887    0.001    0.000    0.394    0.000 D:/repos/cartpole/dql/pacman.py:112(remember)
+      905    0.393    0.000    0.393    0.000 {method 'append' of 'collections.deque' objects}
+     1822    0.032    0.000    0.174    0.000 C:\Users\chane\AppData\Local\Programs\Python\Python36\lib\site-packages\keras\backend\tensorflow_backend.py:156(get_session)
+
+
+3 res
+Epoch 13/15
+ - 208s - loss: 1.1039 - val_loss: 1.2708
+Epoch 14/15
+ - 209s - loss: 0.9142 - val_loss: 1.1160
+Epoch 15/15
+ - 209s - loss: 0.8307 - val_loss: 1.7365
+
+4 res
+Epoch 13/15
+ - 228s - loss: 1.0785 - val_loss: 1.6002
+Epoch 14/15
+ - 228s - loss: 0.8420 - val_loss: 1.0139
+Epoch 15/15
+ - 227s - loss: 0.9597 - val_loss: 1.0117
+
+6 res
+Epoch 5/15
+ - 273s - loss: 1.3584 - val_loss: 1.0835
+Epoch 6/15
+ - 268s - loss: 1.4353 - val_loss: 1.3022
+Epoch 7/15
+ - 271s - loss: 1.8479 - val_loss: 1.1113
+
+6 res batch norm
+Epoch 13/15
+ - 354s - loss: 0.7722 - val_loss: 69.2971
+Epoch 14/15
+ - 349s - loss: 0.7662 - val_loss: 75.6086
+Epoch 15/15
+ - 353s - loss: 0.6918 - val_loss: 87.0900
+
+
+
