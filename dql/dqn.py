@@ -1,44 +1,56 @@
 # -*- coding: utf-8 -*-
 import random
-import gym
+import gymnasium as gym
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from collections import deque
-from keras.models import Sequential
-from keras.layers import Dense, BatchNormalization, Activation
-from keras.optimizers import Adam
-from keras.regularizers import l2
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 EPISODES = 10000
+
+class DQNNetwork(nn.Module):
+    def __init__(self, state_size, action_size):
+        super(DQNNetwork, self).__init__()
+        self.fc1 = nn.Linear(state_size, 64)  # Increased layer size
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Linear(64, 64)  # Increased layer size
+        self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(64, action_size)
+        
+    def forward(self, x):
+        x = self.relu1(self.fc1(x))
+        x = self.relu2(self.fc2(x))
+        return self.fc3(x)
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.memory = deque(maxlen=5000)
-        self.gamma = 0.95    # discount rate
+        self.memory = deque(maxlen=10000)  # Increased memory size
+        self.gamma = 0.99    # Increased discount rate
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.999
-        self.learning_rate = 0.0002
+        self.epsilon_decay = 0.995  # Slower decay for better exploration
+        self.learning_rate = 0.0005  # Adjusted learning rate
         self.model = self._build_model()
+        self.target_model = self._build_model()  # Target network
+        self.update_target_model()  # Copy weights to target model
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=1e-5)  # Added weight decay
+        self.criterion = nn.MSELoss()
+        self.update_target_counter = 0
+        self.update_target_frequency = 10  # Update target model every N episodes
 
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
-        reg = None
-        # reg = l2(0.0001)
-
-        model = Sequential()
-        model.add(Dense(48, input_dim=self.state_size, activation='relu', kernel_regularizer=reg))
-        # model.add(Dense(96, kernel_regularizer=reg))
-        # model.add(Activation('relu'))
-        # model.add(Dense(48, kernel_regularizer=reg))
-        # model.add(BatchNormalization())
-        # model.add(Activation('relu'))
-        model.add(Dense(48, activation='relu', kernel_regularizer=reg))
-        model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse',
-                      optimizer=Adam(lr=self.learning_rate))
+        model = DQNNetwork(self.state_size, self.action_size).to(device)
         return model
+        
+    def update_target_model(self):
+        # Copy weights from model to target_model
+        self.target_model.load_state_dict(self.model.state_dict())
 
     def remember(self, state, action, reward, next_state, done, time):
         self.memory.append((state, action, reward, next_state, done, time))
@@ -46,20 +58,34 @@ class DQNAgent:
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])  # returns action
+        state_tensor = torch.FloatTensor(state).to(device)
+        with torch.no_grad():
+            act_values = self.model(state_tensor)
+        return torch.argmax(act_values[0]).item()  # returns action
 
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
         for state, action, reward, next_state, done, time in minibatch:
             target = reward
             if not done:
-                target = (reward + self.gamma *
-                          np.amax(self.model.predict(next_state)[0]))
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-
-        self.model.fit(state, target_f, epochs=1, verbose=0)
+                next_state_tensor = torch.FloatTensor(next_state).to(device)
+                with torch.no_grad():
+                    target = reward + self.gamma * torch.max(self.model(next_state_tensor)[0]).item()
+            
+            state_tensor = torch.FloatTensor(state).to(device)
+            with torch.no_grad():
+                target_f = self.model(state_tensor)
+            
+            target_f_numpy = target_f.cpu().numpy()
+            target_f_numpy[0][action] = target
+            target_f = torch.FloatTensor(target_f_numpy).to(device)
+            
+            self.optimizer.zero_grad()
+            outputs = self.model(state_tensor)
+            loss = self.criterion(outputs, target_f)
+            loss.backward()
+            self.optimizer.step()
+            
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -73,8 +99,14 @@ class DQNAgent:
 
         next_states = np.stack(next_states, axis=0)
         states = np.stack(states, axis=0)
-        Qn = self.model.predict(next_states)
-        Q = self.model.predict(states)
+        
+        next_states_tensor = torch.FloatTensor(next_states).to(device)
+        states_tensor = torch.FloatTensor(states).to(device)
+        
+        with torch.no_grad():
+            # Use target model for more stable Q values
+            Qn = self.target_model(next_states_tensor).cpu().numpy()
+            Q = self.model(states_tensor).cpu().numpy()
 
         targets_f = []
         for i, (state, action, reward, next_state, done, time) in enumerate(minibatch):
@@ -84,35 +116,44 @@ class DQNAgent:
             target_f = Q[i]
             target_f[action] = target
             targets_f.append(target_f)
-            # if time == 400:
-            #     print("Q: ", Q[i])
 
         targets_f = np.stack(targets_f, axis=0)
-        self.model.fit(states, targets_f, epochs=1, verbose=0)
+        targets_tensor = torch.FloatTensor(targets_f).to(device)
+        
+        self.optimizer.zero_grad()
+        outputs = self.model(states_tensor)
+        loss = self.criterion(outputs, targets_tensor)
+        loss.backward()
+        # Gradient clipping to prevent exploding gradients
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        self.optimizer.step()
+        
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
     def load(self, name):
-        self.model.load_weights(name)
+        self.model.load_state_dict(torch.load(name))
+        self.model.eval()
 
     def save(self, name):
-        self.model.save_weights(name)
+        torch.save(self.model.state_dict(), name)
 
 
 def test():
-    env = gym.make('CartPole-v1')
+    env = gym.make('CartPole-v1', render_mode="human")
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
-    agent.load("./est-dqn_perfect.h5")
+    agent.load("./est-dqn_best.pt")
     agent.epsilon = 0.01
 
-    state = env.reset()
+    state, _ = env.reset()
     state = np.reshape(state, [1, state_size])
     for time in range(1000):
         env.render()
         action = agent.act(state)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
         next_state = np.reshape(next_state, [1, state_size])
         state = next_state
         if done:
@@ -125,38 +166,71 @@ def train():
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
-    # agent.load("./est-dqn.h5")
+    # agent.load("./est-dqn.pt")
     # agent.epsilon = 0.01
-    batch_size = 64
+    batch_size = 128  # Increased batch size
     score_window = deque(maxlen=100)
+    best_score = 0
 
     for e in range(EPISODES):
-        state = env.reset()
+        state, _ = env.reset()
         state = np.reshape(state, [1, state_size])
+        total_reward = 0
+        
         for time in range(1000):
             # env.render()
             action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            if time < 499 and done:
-                reward = -20
-            if time == 499:
-                reward = 20  # 1/(1 - gamma)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            
+            # Better reward shaping
+            reward = 1.0  # Reward for surviving each step
+            
+            # Add position penalty - penalize being away from center
+            # Since we need to access the raw state before reshaping
+            cart_position = next_state[0]  # Get the cart position (first element)
+            position_penalty = 0.1 * abs(cart_position)  # Penalty proportional to distance from center
+            reward -= position_penalty  # Subtract penalty from reward
+            
+            if done and time < 499:
+                reward = -10 * (1 - time/499)  # Proportional penalty for early termination
+            if time >= 499:
+                reward = 20  # Bonus for reaching the target
+                
             next_state = np.reshape(next_state, [1, state_size])
             agent.remember(state, action, reward, next_state, done, time)
             state = next_state
+            total_reward += reward
+            
             if done:
+                # Update target network periodically
+                agent.update_target_counter += 1
+                if agent.update_target_counter >= agent.update_target_frequency:
+                    agent.update_target_model()
+                    agent.update_target_counter = 0
+                
                 score_window.append(time)
                 score_avg = sum(score_window) / len(score_window)
+                
+                # Save best model
+                if score_avg > best_score and len(score_window) == 100:
+                    best_score = score_avg
+                    agent.save("./est-dqn_best.pt")
+                    print("New best model saved with avg score: {:.1f}".format(best_score))
+                
                 print("episode: {}/{}, score: {}, avg: {:.1f}, e: {:.2}"
                       .format(e, EPISODES, time, score_avg, agent.epsilon))
                 break
+                
+        # Training with more frequent updates
         if len(agent.memory) > batch_size:
             agent.replay2(batch_size)
+                
         if e % 100 == 0:
-            agent.save("./est-dqn.h5")
+            agent.save("./est-dqn.pt")
 
 
 if __name__ == "__main__":
-    #train()
-    test()
+   #train()
+   test()
 

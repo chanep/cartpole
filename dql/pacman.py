@@ -58,34 +58,54 @@ class DQNAgent:
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.9999
-        self.learning_rate = 0.00002
+        self.learning_rate = 0.00001
         self.model = self._build_model()
         self.state_buffer = deque(maxlen=self.state_size[2])
         for i in range(self.state_size[2]):
             self.state_buffer.append(np.zeros((self.state_size[0], self.state_size[1])))
 
-    def _build_model2(self):
+    def _build_model(self):
         # Neural Net for Deep-Q learning Model
         reg = None
-        #reg = l2(0.0001)
+        #reg = l2(0.00002)
 
         model = Sequential()
+        conv1 = 96
+        convn = 96
 
-        model.add(Conv2D(64, input_shape=self.state_size, kernel_size=8, padding="same", strides=(4, 4), activation="relu", kernel_regularizer=reg))
-        model.add(Conv2D(128, kernel_size=5, padding="same", strides=(2, 2), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(128, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(128, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(128, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Residual(128, (3, 3)))
+        model.add(Conv2D(conv1, input_shape=self.state_size, kernel_size=8, padding="same", activation="relu", strides=(2, 2), kernel_regularizer=reg))
+        model.add(Conv2D(convn, kernel_size=5, padding="same", strides=(2, 2), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
+        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
+        model.add(BatchNormalization())
+        model.add(Activation(activation="relu"))
         model.add(Flatten())
         model.add(Dense(512, activation='relu', kernel_regularizer=reg))
-        # model.add(Dense(128, activation='relu', kernel_regularizer=reg))
         model.add(Dense(self.action_size, activation='linear', kernel_regularizer=reg))
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
 
-    def _build_model(self):
+    def _build_model2(self):
         # Neural Net for Deep-Q learning Model
         reg = None
         #reg = l2(0.00002)
@@ -125,8 +145,8 @@ class DQNAgent:
 
     def add_frame_to_buffer(self, frame):
         frame = cv2.resize(frame, (self.state_size[1], self.state_size[0]), interpolation=cv2.INTER_AREA)
+        frame = (frame / 255).astype('float32')
         frame = [frame[:, :, i] for i in range(frame.shape[2])]
-        #print("frame: ", frame)
         self.state_buffer.extend(frame)
 
     def get_state_buffer(self):
@@ -136,10 +156,12 @@ class DQNAgent:
 
     def replay(self, batch_size):
         self.replay_count += 1
-        minibatch = random.sample(self.memory, batch_size)
+        mb_size = 256
+        batch_size = batch_size - (batch_size % mb_size)
+        batch = random.sample(self.memory, batch_size)
         next_states = []
         states = []
-        for state, action, reward, next_state, done, time in minibatch:
+        for state, action, reward, next_state, done, time in batch:
             next_states.append(next_state)
             states.append(state)
 
@@ -150,7 +172,7 @@ class DQNAgent:
         Q = self.model.predict(states)
 
         targets_f = []
-        for i, (state, action, reward, next_state, done, time) in enumerate(minibatch):
+        for i, (state, action, reward, next_state, done, time) in enumerate(batch):
             target = reward
             if not done:
                 target = (reward + self.gamma * np.amax(Qn[i]))
@@ -161,7 +183,7 @@ class DQNAgent:
             #     print("Q: ", Q[i])
 
         targets_f = np.stack(targets_f, axis=0)
-        self.model.fit(states, targets_f, batch_size=256, epochs=1, verbose=0)
+        self.model.fit(states, targets_f, batch_size=mb_size, epochs=1, verbose=0)
         if self.replay_count > self.epsilon_start_decay and self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -215,39 +237,6 @@ class DQNAgent:
         self.model.save_weights(name)
 
 
-def test():
-    env = gym.make("MsPacman-v0")
-    state_size = env.observation_space.shape
-    action_size = env.action_space.n
-    agent = DQNAgent(state_size, action_size)
-    agent.load("./est-pacman_7conv.h5")
-    agent.epsilon = 0.0
-
-    for i in range(5):
-        frame = env.reset()
-        agent.add_frame_to_buffer(frame)
-        state = agent.get_state_buffer()
-        score = 0
-        for time in range(10000):
-            env.render()
-            tt.sleep(0.02)
-            action = agent.act(state)
-            next_frame, reward, done, _ = env.step(action)
-            score += reward
-            agent.add_frame_to_buffer(next_frame)
-            next_state = agent.get_state_buffer()
-            # scipy.misc.imsave(f'frame{time:0=3d}.jpg', state[:, :, 0:3])
-            state = next_state
-            if time % 100 == 0:
-                print("frame: ", time)
-            if done:
-                # x = state[:,:,0]
-                # plt.imshow(x)
-                # plt.show()
-                print("score: {}, frames:{}".format(score, time))
-                break
-
-
 def create_train_set():
     env = gym.make('MsPacman-v0')
     state_size = env.observation_space.shape
@@ -280,6 +269,9 @@ def create_train_set():
 
             score += reward
 
+            # if done:
+            #     reward = -250
+
             agent.remember(state, action, reward, next_state, done, time)
             state = next_state
             if done:
@@ -311,6 +303,39 @@ def fit_train_set():
     agent.fit_train_set("./trainset_pacman.dat", None, "./est-pacman_default.h5", 15)
 
 
+def test():
+    env = gym.make("MsPacman-v0")
+    state_size = env.observation_space.shape
+    action_size = env.action_space.n
+    agent = DQNAgent(state_size, action_size)
+    agent.load("./est-pacman_98_done50.h5")
+    agent.epsilon = 0.0
+
+    for i in range(5):
+        frame = env.reset()
+        agent.add_frame_to_buffer(frame)
+        state = agent.get_state_buffer()
+        score = 0
+        for time in range(10000):
+            env.render()
+            tt.sleep(0.02)
+            action = agent.act(state)
+            next_frame, reward, done, _ = env.step(action)
+            score += reward
+            agent.add_frame_to_buffer(next_frame)
+            next_state = agent.get_state_buffer()
+            # scipy.misc.imsave(f'frame{time:0=3d}.jpg', state[:, :, 0:3])
+            state = next_state
+            if time % 100 == 0:
+                print("frame: ", time)
+            if done:
+                # x = state[:,:,0]
+                # plt.imshow(x)
+                # plt.show()
+                print("score: {}, frames:{}".format(score, time))
+                break
+
+
 def train():
 
     env = gym.make('MsPacman-v0')
@@ -318,11 +343,18 @@ def train():
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
 
-    agent.load("./est-pacman_7conv.h5")
-    agent.epsilon_start_decay = 0
-    agent.gamma = 0.998
+    # agent.load("./est-pacman_98.h5")
+    # agent.epsilon_start_decay = 0
+    # agent.gamma = 0.98
     # agent.learning_rate = 0.00001
-    agent.epsilon = 0.5
+    # agent.epsilon = 0.099  # avg 2000
+
+    agent.load("./est-pacman_bn2.h5")
+    agent.epsilon_start_decay = 0
+    agent.gamma = 0.98
+    agent.learning_rate = 0.00002
+    agent.epsilon = 0.1
+    agent.epsilon_min = 0.0
 
     min_batch_size = 512
     score_window = deque(maxlen=100)
@@ -347,6 +379,9 @@ def train():
 
             score += reward
 
+            if done:
+                reward = -50
+
             agent.remember(state, action, reward, next_state, done, time)
             state = next_state
             if done:
@@ -360,7 +395,7 @@ def train():
         if len(agent.memory) > 20000:
             agent.replay(max(min_batch_size, frames_avg))
         if e != 0 and e % 100 == 0:
-            agent.save("./est-pacman_998.h5")
+            agent.save("./est-pacman_bn2.h5")
         if profile:
             pr.disable()
             s = io.StringIO()

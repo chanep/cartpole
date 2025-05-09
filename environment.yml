@@ -1,0 +1,16 @@
+name: cartpole-pytorch-env
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.12
+  - pytorch
+  - pytorch-cuda=12.4
+  - torchvision # Often useful with PyTorch, though not strictly for this script
+  - torchaudio  # Same as above
+  - numpy
+  - gymnasium
+  - pygame
+  - matplotlib
