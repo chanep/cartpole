@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 import random
-import gym
+import gymnasium as gym
 import numpy as np
 from collections import deque
-from keras.models import Sequential
-from keras.layers import Dense, BatchNormalization, Activation, Conv2D, Flatten
-from keras.optimizers import Adam
-from dql.residual import Residual
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
 import time as tt
-from keras.regularizers import l2
 import matplotlib.pyplot as plt
-import scipy.misc
 import cv2
 import pickle
 import os
 import cProfile, pstats, io
+import ale_py
+gym.register_envs(ale_py)
 
 EPISODES = 100000
 
@@ -46,6 +46,66 @@ class TrainSet:
             return pickle.load(f)
 
 
+class DQNModel(nn.Module):
+    def __init__(self, state_size, action_size, reg=None):
+        super(DQNModel, self).__init__()
+        self.conv1 = nn.Conv2d(state_size[2], 96, kernel_size=8, stride=2, padding=3)
+        self.conv2 = nn.Conv2d(96, 96, kernel_size=5, stride=2, padding=2, bias=False)
+        self.bn2 = nn.BatchNorm2d(96)
+        self.conv3 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(96)
+        self.conv4 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn4 = nn.BatchNorm2d(96)
+        self.conv5 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn5 = nn.BatchNorm2d(96)
+        self.conv6 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn6 = nn.BatchNorm2d(96)
+        self.conv7 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn7 = nn.BatchNorm2d(96)
+        self.conv8 = nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn8 = nn.BatchNorm2d(96)
+        
+        # Calculate the flattened size based on input dimensions
+        self._to_linear = None
+        self._get_conv_output(state_size)
+        
+        self.fc1 = nn.Linear(self._to_linear, 512)
+        self.fc2 = nn.Linear(512, action_size)
+        
+    def _get_conv_output(self, shape):
+        bs = 1
+        input = torch.rand(bs, shape[2], shape[0], shape[1])
+        output = self._forward_conv(input)
+        self._to_linear = int(np.prod(output.size()))
+        
+    def _forward_conv(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.bn2(self.conv2(x))
+        x = F.relu(x)
+        x = self.bn3(self.conv3(x))
+        x = F.relu(x)
+        x = self.bn4(self.conv4(x))
+        x = F.relu(x)
+        x = self.bn5(self.conv5(x))
+        x = F.relu(x)
+        x = self.bn6(self.conv6(x))
+        x = F.relu(x)
+        x = self.bn7(self.conv7(x))
+        x = F.relu(x)
+        x = self.bn8(self.conv8(x))
+        x = F.relu(x)
+        return x
+        
+    def forward(self, x):
+        x = x.permute(0, 3, 1, 2)  # Convert from NHWC to NCHW format
+        x = self._forward_conv(x)
+        # Replace view with reshape or make the tensor contiguous first
+        x = x.contiguous().view(x.size(0), -1)  # Make tensor contiguous before using view
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+
 class DQNAgent:
     def __init__(self, state_size, action_size):
         # self.state_size = (210, 160, 6)
@@ -59,75 +119,16 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.9999
         self.learning_rate = 0.00001
-        self.model = self._build_model()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self._build_model().to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.state_buffer = deque(maxlen=self.state_size[2])
         for i in range(self.state_size[2]):
             self.state_buffer.append(np.zeros((self.state_size[0], self.state_size[1])))
 
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
-        reg = None
-        #reg = l2(0.00002)
-
-        model = Sequential()
-        conv1 = 96
-        convn = 96
-
-        model.add(Conv2D(conv1, input_shape=self.state_size, kernel_size=8, padding="same", activation="relu", strides=(2, 2), kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=5, padding="same", strides=(2, 2), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), use_bias=False, kernel_regularizer=reg))
-        model.add(BatchNormalization())
-        model.add(Activation(activation="relu"))
-        model.add(Flatten())
-        model.add(Dense(512, activation='relu', kernel_regularizer=reg))
-        model.add(Dense(self.action_size, activation='linear', kernel_regularizer=reg))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        return model
-
-
-    def _build_model2(self):
-        # Neural Net for Deep-Q learning Model
-        reg = None
-        #reg = l2(0.00002)
-
-        model = Sequential()
-        conv1 = 96
-        convn = 128
-
-        model.add(Conv2D(conv1, input_shape=self.state_size, kernel_size=8, padding="same", strides=(2, 2), activation="relu", kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=5, padding="same", strides=(2, 2), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
-        model.add(Flatten())
-        model.add(Dense(512, activation='relu', kernel_regularizer=reg))
-        model.add(Dense(self.action_size, activation='linear', kernel_regularizer=reg))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        return model
+        return DQNModel(self.state_size, self.action_size)
 
     def remember(self, state, action, reward, next_state, done, time):
         self.memory.append((state, action, reward, next_state, done, time))
@@ -135,9 +136,10 @@ class DQNAgent:
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
-        states = np.expand_dims(state, axis=0)
-        act_values = self.model.predict(states)
-        return np.argmax(act_values[0])  # returns action
+        state_tensor = torch.FloatTensor(np.expand_dims(state, axis=0)).to(self.device)
+        with torch.no_grad():
+            act_values = self.model(state_tensor)
+        return torch.argmax(act_values[0]).item()  # returns action
 
     def reset_state_buffer(self):
         for i in range(self.state_size[2]):
@@ -159,55 +161,62 @@ class DQNAgent:
         mb_size = 256
         batch_size = batch_size - (batch_size % mb_size)
         batch = random.sample(self.memory, batch_size)
-        next_states = []
-        states = []
-        for state, action, reward, next_state, done, time in batch:
-            next_states.append(next_state)
-            states.append(state)
-
-        next_states = np.stack(next_states, axis=0)
-        states = np.stack(states, axis=0)
-
-        Qn = self.model.predict(next_states)
-        Q = self.model.predict(states)
-
-        targets_f = []
-        for i, (state, action, reward, next_state, done, time) in enumerate(batch):
-            target = reward
-            if not done:
-                target = (reward + self.gamma * np.amax(Qn[i]))
-            target_f = Q[i]
-            target_f[action] = target
-            targets_f.append(target_f)
-            # if time == 400:
-            #     print("Q: ", Q[i])
-
-        targets_f = np.stack(targets_f, axis=0)
-        self.model.fit(states, targets_f, batch_size=mb_size, epochs=1, verbose=0)
+        
+        for i in range(0, batch_size, mb_size):
+            mini_batch = batch[i:i+mb_size]
+            states = np.array([b[0] for b in mini_batch])
+            actions = np.array([b[1] for b in mini_batch])
+            rewards = np.array([b[2] for b in mini_batch])
+            next_states = np.array([b[3] for b in mini_batch])
+            dones = np.array([b[4] for b in mini_batch])
+            
+            states_tensor = torch.FloatTensor(states).to(self.device)
+            next_states_tensor = torch.FloatTensor(next_states).to(self.device)
+            actions_tensor = torch.LongTensor(actions).to(self.device)
+            rewards_tensor = torch.FloatTensor(rewards).to(self.device)
+            dones_tensor = torch.FloatTensor(dones).to(self.device)
+            
+            # Get current Q values
+            current_q_values = self.model(states_tensor).gather(1, actions_tensor.unsqueeze(1)).squeeze(1)
+            
+            # Get next Q values
+            with torch.no_grad():
+                next_q_values = self.model(next_states_tensor).max(1)[0]
+                target_q_values = rewards_tensor + (1 - dones_tensor) * self.gamma * next_q_values
+            
+            # Compute loss
+            loss = F.mse_loss(current_q_values, target_q_values)
+            
+            # Optimize the model
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+        
         if self.replay_count > self.epsilon_start_decay and self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
     def save_train_set(self, batch_size, filename):
         while len(self.memory) > 0:
-            minibatch = [self.memory.popleft() for _i in range(max(batch_size, len(self.memory)))]
+            minibatch = [self.memory.popleft() for _i in range(min(batch_size, len(self.memory)))]
             next_states = []
             states = []
             for state, action, reward, next_state, done, time in minibatch:
                 next_states.append(next_state)
                 states.append(state)
 
-            next_states = np.stack(next_states, axis=0)
-            states = np.stack(states, axis=0)
+            next_states_tensor = torch.FloatTensor(np.stack(next_states, axis=0)).to(self.device)
+            states_tensor = torch.FloatTensor(np.stack(states, axis=0)).to(self.device)
 
-            Qn = self.model.predict(next_states)
-            Q = self.model.predict(states)
+            with torch.no_grad():
+                Qn = self.model(next_states_tensor).cpu().numpy()
+                Q = self.model(states_tensor).cpu().numpy()
 
             train_set = TrainSet.load_from_file(filename)
             for i, (state, action, reward, next_state, done, time) in enumerate(minibatch):
                 target = reward
                 if not done:
                     target = (reward + self.gamma * np.amax(Qn[i]))
-                target_f = Q[i]
+                target_f = Q[i].copy()
                 target_f[action] = target
                 train_set.append(state, target_f)
 
@@ -220,30 +229,60 @@ class DQNAgent:
         if prev_weights_file is not None:
             self.load(prev_weights_file)
 
-        self.model.fit(states, targets,
-                       batch_size=256,
-                       epochs=epochs,
-                       shuffle=True,
-                       validation_split=0.02,
-                       verbose=2,
-                       callbacks=None)
+        states_tensor = torch.FloatTensor(states).to(self.device)
+        targets_tensor = torch.FloatTensor(targets).to(self.device)
+        
+        dataset = torch.utils.data.TensorDataset(states_tensor, targets_tensor)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
+        
+        validation_split = 0.02
+        dataset_size = len(dataset)
+        val_size = int(validation_split * dataset_size)
+        train_size = dataset_size - val_size
+        train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+        
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=256, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=256, shuffle=False)
+        
+        for epoch in range(epochs):
+            # Training phase
+            self.model.train()
+            train_loss = 0.0
+            for batch_states, batch_targets in train_loader:
+                self.optimizer.zero_grad()
+                outputs = self.model(batch_states)
+                loss = F.mse_loss(outputs, batch_targets)
+                loss.backward()
+                self.optimizer.step()
+                train_loss += loss.item()
+            
+            # Validation phase
+            self.model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for batch_states, batch_targets in val_loader:
+                    outputs = self.model(batch_states)
+                    val_loss += F.mse_loss(outputs, batch_targets).item()
+            
+            print(f"Epoch {epoch+1}/{epochs}, Training loss: {train_loss/len(train_loader):.6f}, Validation loss: {val_loss/len(val_loader):.6f}")
 
         self.save(weights_file)
 
     def load(self, name):
-        self.model.load_weights(name)
+        self.model.load_state_dict(torch.load(name))
+        self.model.eval()
 
     def save(self, name):
-        self.model.save_weights(name)
+        torch.save(self.model.state_dict(), name)
 
 
 def create_train_set():
-    env = gym.make('MsPacman-v0')
+    env = gym.make('ALE/MsPacman-v5', render_mode=None)
     state_size = env.observation_space.shape
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
 
-    agent.load("./est-pacman_h.h5")
+    agent.load("./est-pacman_h.pt")
     agent.epsilon_start_decay = 0
     agent.gamma = 0.99
     agent.learning_rate = 0.00005
@@ -257,13 +296,14 @@ def create_train_set():
 
     for e in range(EPISODES):
         agent.reset_state_buffer()
-        frame = env.reset()
+        frame, _ = env.reset()
         agent.add_frame_to_buffer(frame)
         state = agent.get_state_buffer()
         score = 0
         for time in range(100000):
             action = agent.act(state)
-            next_frame, reward, done, _ = env.step(action)
+            next_frame, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
             agent.add_frame_to_buffer(next_frame)
             next_state = agent.get_state_buffer()
 
@@ -289,41 +329,35 @@ def create_train_set():
 
 
 def fit_train_set():
-    # tr = TrainSet.load_from_file("./trainset.dat")
-    # tr.shuffle()
-    # tr.save_to_file("./trainset2.dat")
-    # print("fin shuffle")
-    # tt.sleep(5)
-    env = gym.make('MsPacman-v0')
+    env = gym.make('ALE/MsPacman-v5', render_mode=None)
     state_size = env.observation_space.shape
-    action_size = env.action_space.n
+    action_size = env.observation_space.n
     agent = DQNAgent(state_size, action_size)
-    #agent.learning_rate = 0.0001
 
-    agent.fit_train_set("./trainset_pacman.dat", None, "./est-pacman_default.h5", 15)
+    agent.fit_train_set("./trainset_pacman.dat", None, "./est-pacman_default.pt", 15)
 
 
 def test():
-    env = gym.make("MsPacman-v0")
+    env = gym.make("ALE/MsPacman-v5", render_mode="human")
     state_size = env.observation_space.shape
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
-    agent.load("./est-pacman_98_done50.h5")
+    agent.load("./est-pacman_bn2.pt")
     agent.epsilon = 0.0
 
     for i in range(5):
-        frame = env.reset()
+        frame, _ = env.reset()
         agent.add_frame_to_buffer(frame)
         state = agent.get_state_buffer()
         score = 0
         for time in range(10000):
-            env.render()
-            tt.sleep(0.02)
             action = agent.act(state)
-            next_frame, reward, done, _ = env.step(action)
+            next_frame, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
             score += reward
             agent.add_frame_to_buffer(next_frame)
             next_state = agent.get_state_buffer()
+            tt.sleep(0.02)
             # scipy.misc.imsave(f'frame{time:0=3d}.jpg', state[:, :, 0:3])
             state = next_state
             if time % 100 == 0:
@@ -337,24 +371,23 @@ def test():
 
 
 def train():
-
-    env = gym.make('MsPacman-v0')
+    env = gym.make('ALE/MsPacman-v5', render_mode=None)
     state_size = env.observation_space.shape
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
 
-    # agent.load("./est-pacman_98.h5")
+    # agent.load("./est-pacman_98.pt")
     # agent.epsilon_start_decay = 0
     # agent.gamma = 0.98
     # agent.learning_rate = 0.00001
     # agent.epsilon = 0.099  # avg 2000
 
-    agent.load("./est-pacman_bn2.h5")
-    agent.epsilon_start_decay = 0
-    agent.gamma = 0.98
-    agent.learning_rate = 0.00002
-    agent.epsilon = 0.1
-    agent.epsilon_min = 0.0
+    # agent.load("./est-pacman_bn2.pt")
+    # agent.epsilon_start_decay = 0
+    # agent.gamma = 0.98
+    # agent.learning_rate = 0.00002
+    # agent.epsilon = 0.1
+    # agent.epsilon_min = 0.0
 
     min_batch_size = 512
     score_window = deque(maxlen=100)
@@ -367,13 +400,14 @@ def train():
             pr.enable()
 
         agent.reset_state_buffer()
-        frame = env.reset()
+        frame, _ = env.reset()
         agent.add_frame_to_buffer(frame)
         state = agent.get_state_buffer()
         score = 0
         for time in range(100000):
             action = agent.act(state)
-            next_frame, reward, done, _ = env.step(action)
+            next_frame, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
             agent.add_frame_to_buffer(next_frame)
             next_state = agent.get_state_buffer()
 
@@ -395,7 +429,7 @@ def train():
         if len(agent.memory) > 20000:
             agent.replay(max(min_batch_size, frames_avg))
         if e != 0 and e % 100 == 0:
-            agent.save("./est-pacman_bn2.h5")
+            agent.save("./est-pacman_bn2.pt")
         if profile:
             pr.disable()
             s = io.StringIO()
@@ -409,6 +443,6 @@ def train():
 if __name__ == "__main__":
     #create_train_set()
     #fit_train_set()
-    train()
-    #test()
+    #train()
+    test()
 

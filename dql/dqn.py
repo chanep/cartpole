@@ -15,14 +15,13 @@ class DQNNetwork(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQNNetwork, self).__init__()
         self.fc1 = nn.Linear(state_size, 64)  # Increased layer size
-        self.relu1 = nn.ReLU()
         self.fc2 = nn.Linear(64, 64)  # Increased layer size
-        self.relu2 = nn.ReLU()
         self.fc3 = nn.Linear(64, action_size)
+        self.relu = nn.ReLU()
         
     def forward(self, x):
-        x = self.relu1(self.fc1(x))
-        x = self.relu2(self.fc2(x))
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
         return self.fc3(x)
 
 class DQNAgent:
@@ -33,7 +32,7 @@ class DQNAgent:
         self.gamma = 0.99    # Increased discount rate
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995  # Slower decay for better exploration
+        self.epsilon_decay = 0.999  # Slower decay for better exploration
         self.learning_rate = 0.0005  # Adjusted learning rate
         self.model = self._build_model()
         self.target_model = self._build_model()  # Target network
@@ -64,32 +63,6 @@ class DQNAgent:
         return torch.argmax(act_values[0]).item()  # returns action
 
     def replay(self, batch_size):
-        minibatch = random.sample(self.memory, batch_size)
-        for state, action, reward, next_state, done, time in minibatch:
-            target = reward
-            if not done:
-                next_state_tensor = torch.FloatTensor(next_state).to(device)
-                with torch.no_grad():
-                    target = reward + self.gamma * torch.max(self.model(next_state_tensor)[0]).item()
-            
-            state_tensor = torch.FloatTensor(state).to(device)
-            with torch.no_grad():
-                target_f = self.model(state_tensor)
-            
-            target_f_numpy = target_f.cpu().numpy()
-            target_f_numpy[0][action] = target
-            target_f = torch.FloatTensor(target_f_numpy).to(device)
-            
-            self.optimizer.zero_grad()
-            outputs = self.model(state_tensor)
-            loss = self.criterion(outputs, target_f)
-            loss.backward()
-            self.optimizer.step()
-            
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
-    def replay2(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
         next_states = []
         states = []
@@ -224,7 +197,7 @@ def train():
                 
         # Training with more frequent updates
         if len(agent.memory) > batch_size:
-            agent.replay2(batch_size)
+            agent.replay(batch_size)
                 
         if e % 100 == 0:
             agent.save("./est-dqn.pt")

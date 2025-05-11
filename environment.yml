@@ -14,3 +14,8 @@ dependencies:
   - gymnasium
   - pygame
   - matplotlib
+  - opencv 
+  - pip
+  - pip:
+    - ale-py
+    - "tensorflow[and-cuda]==2.19.0"
