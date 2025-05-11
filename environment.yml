@@ -1,15 +1,9 @@
 name: cartpole-pytorch-env
 channels:
   - conda-forge
-  - pytorch
-  - nvidia
   - defaults
 dependencies:
   - python=3.12
-  - pytorch
-  - pytorch-cuda=12.4
-  - torchvision # Often useful with PyTorch, though not strictly for this script
-  - torchaudio  # Same as above
   - numpy
   - gymnasium
   - pygame
@@ -17,5 +11,4 @@ dependencies:
   - opencv 
   - pip
   - pip:
-    - ale-py
-    - "tensorflow[and-cuda]==2.19.0"
+      - -r requirements.txt

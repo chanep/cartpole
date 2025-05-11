@@ -440,7 +440,64 @@ def train():
             break
 
 
+def test_gpu_performance():
+    import torch
+    import time
+    
+    # Check if CUDA is available
+    if not torch.cuda.is_available():
+        print("CUDA is not available. Running on CPU.")
+        return False
+    
+    # Get device information
+    device = torch.device("cuda")
+    print(f"Using device: {torch.cuda.get_device_name(0)}")
+    print(f"CUDA version: {torch.version.cuda}")
+    
+    # Create large tensors to test computation speed
+    size = 5000
+    a = torch.randn(size, size, device=device)
+    b = torch.randn(size, size, device=device)
+    
+    # Warm-up run
+    torch.matmul(a, b)
+    torch.cuda.synchronize()
+    
+    # Benchmark matrix multiplication
+    iterations = 10
+    start_time = time.time()
+    for _ in range(iterations):
+        c = torch.matmul(a, b)
+        torch.cuda.synchronize()  # Wait for GPU to finish
+    end_time = time.time()
+    
+    elapsed_time = end_time - start_time
+    ops_per_second = iterations / elapsed_time
+    print(f"Performed {iterations} matrix multiplications in {elapsed_time:.4f} seconds")
+    print(f"Performance: {ops_per_second:.2f} operations per second")
+    
+    # Check if performance seems reasonable for a GPU
+    # An RTX 5070 should easily do multiple ops per second for this size
+    is_gpu_speed = ops_per_second > 1.0
+    
+    # Check memory usage
+    print(f"GPU memory allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+    print(f"GPU memory reserved: {torch.cuda.memory_reserved(0) / 1e9:.2f} GB")
+    
+    if is_gpu_speed:
+        print("Performance indicates GPU is being utilized properly.")
+    else:
+        print("Performance is lower than expected. GPU might not be utilized properly.")
+    
+    return is_gpu_speed
+
 if __name__ == "__main__":
+    # gpu_working = test_gpu_performance()
+    
+    # if gpu_working:
+    #     print("GPU is working well, proceeding with training")
+    # else:
+    #     print("WARNING: GPU performance is not optimal")
     #create_train_set()
     #fit_train_set()
     #train()

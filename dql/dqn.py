@@ -7,6 +7,11 @@ import torch.nn as nn
 import torch.optim as optim
 from collections import deque
 
+if torch.cuda.is_available():
+    print("Using GPU for training")
+else:
+    print("Using CPU for training")
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 EPISODES = 10000
@@ -206,4 +211,5 @@ def train():
 if __name__ == "__main__":
    #train()
    test()
+   print("Training and testing completed.")
 

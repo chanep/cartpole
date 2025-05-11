@@ -1,10 +1,11 @@
+import os
 import random
 import gymnasium as gym
 import numpy as np
 from collections import deque
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, BatchNormalization, Activation, Conv2D, Flatten
+from tensorflow.keras.layers import Dense, BatchNormalization, Activation, Conv2D, Flatten, Input
 from tensorflow.keras.optimizers import Adam
 import time as tt
 import cv2
@@ -72,7 +73,8 @@ class DQNAgent:
         conv1 = 96
         convn = 96
 
-        model.add(Conv2D(conv1, input_shape=self.state_size, kernel_size=8, padding="same", activation="relu", strides=(2, 2), kernel_regularizer=reg))
+        model.add(Input(shape=self.state_size)) # Use keras.Input
+        model.add(Conv2D(conv1, kernel_size=8, padding="same", activation="relu", strides=(2, 2), kernel_regularizer=reg))
         model.add(Conv2D(convn, kernel_size=5, padding="same", strides=(2, 2), use_bias=False, kernel_regularizer=reg))
         model.add(BatchNormalization())
         model.add(Activation(activation="relu"))
@@ -113,7 +115,8 @@ class DQNAgent:
         conv1 = 96
         convn = 128
 
-        model.add(Conv2D(conv1, input_shape=self.state_size, kernel_size=8, padding="same", strides=(2, 2), activation="relu", kernel_regularizer=reg))
+        model.add(Input(shape=self.state_size)) # Use keras.Input
+        model.add(Conv2D(conv1, kernel_size=8, padding="same", strides=(2, 2), activation="relu", kernel_regularizer=reg))
         model.add(Conv2D(convn, kernel_size=5, padding="same", strides=(2, 2), activation='relu', kernel_regularizer=reg))
         model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
         model.add(Conv2D(convn, kernel_size=3, padding="same", strides=(1, 1), activation='relu', kernel_regularizer=reg))
@@ -407,14 +410,13 @@ def train():
 
 def check_tf_gpu():
     # Set environment variables to help TensorFlow find CUDA
-    import os
+    import os # os is already imported, but keeping local import for function context
     # Tell TensorFlow to use the GPU
     os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-    # Set CUDA environment variables
-    os.environ['TF_CUDA_PATHS'] = 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3'
     # Print CUDA environment for debugging
-    print("CUDA_VISIBLE_DEVICES:", os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set'))
-    print("CUDA_PATH:", os.environ.get('CUDA_PATH', 'Not set'))
+    # CUDA_VISIBLE_DEVICES is now set globally at the top of the script.
+    # Printing it here will reflect that initial setting or any runtime changes.
+    print("CUDA_VISIBLE_DEVICES (at check_tf_gpu):", os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set'))
     
     import tensorflow as tf
     print("TensorFlow version:", tf.__version__)
@@ -440,8 +442,10 @@ def check_tf_gpu():
         # Print GPU details
         gpus = tf.config.list_physical_devices('GPU')
         for gpu in gpus:
-            print("  Name:", gpu.name)
-            print("  Device type:", gpu.device_type)
+            # gpu.name from tf.config.list_physical_devices is the TF internal device path.
+            # The marketing name (e.g., "NVIDIA GeForce RTX 5070 Ti") is usually logged by TF internally.
+            print(f"  TensorFlow Device Path: {gpu.name}")
+            print(f"  Device type: {gpu.device_type}")
         # Test GPU computation
         with tf.device('/GPU:0'):
             a = tf.constant([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -453,9 +457,9 @@ def check_tf_gpu():
         print("No GPU available. Using CPU instead.")
 
 if __name__ == "__main__":
-    check_tf_gpu()
+    check_tf_gpu() # Ensure this is called first and uncommented
     #create_train_set()
     #fit_train_set()
-    #train()
+    train()
     #test()
 
