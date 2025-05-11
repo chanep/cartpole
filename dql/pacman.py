@@ -16,6 +16,10 @@ import cProfile, pstats, io
 import ale_py
 gym.register_envs(ale_py)
 
+# Set matmul precision for better performance on compatible GPUs
+if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7: # Ampere and newer
+    torch.set_float32_matmul_precision('high')
+
 EPISODES = 100000
 
 
@@ -121,6 +125,13 @@ class DQNAgent:
         self.learning_rate = 0.00001
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self._build_model().to(self.device)
+        # Compile the model for potential performance improvement
+        # Use "aot_eager" backend to avoid Triton dependency if it's causing issues
+        try:
+            self.model = torch.compile(self.model, backend="aot_eager")
+        except Exception as e:
+            print(f"Failed to compile model with aot_eager: {e}")
+            print("Proceeding without model compilation.")
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.state_buffer = deque(maxlen=self.state_size[2])
         for i in range(self.state_size[2]):
@@ -375,6 +386,8 @@ def train():
     state_size = env.observation_space.shape
     action_size = env.action_space.n
     agent = DQNAgent(state_size, action_size)
+    
+    #agent.load("./est-pacman_bn2.pt")
 
     # agent.load("./est-pacman_98.pt")
     # agent.epsilon_start_decay = 0
@@ -498,8 +511,9 @@ if __name__ == "__main__":
     #     print("GPU is working well, proceeding with training")
     # else:
     #     print("WARNING: GPU performance is not optimal")
+    
     #create_train_set()
     #fit_train_set()
-    #train()
-    test()
+    train()
+    #test()
 
